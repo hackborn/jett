@@ -88,6 +88,13 @@ func workerRunAll(args condWorkerArgs) {
 	for f != nil {
 		f()
 		atomic.AddInt64(args.unhandled, -1)
+
+		// Bail if the pool is done running
+		// and we're configured for that.
+		if args.opts.CloseImmediately && *args.running == false {
+			return
+		}
+
 		f = args.q.pop()
 	}
 }
@@ -144,6 +151,7 @@ func (q *queue) pop() RunFunc {
 // Not strictly necessary, but prevents making assumptions
 // about the contents of the pool struct.
 type condWorkerArgs struct {
+	opts      Opts
 	running   *bool
 	q         *queue
 	unhandled *int64
@@ -152,5 +160,5 @@ type condWorkerArgs struct {
 }
 
 func newCondWorkerArgs(p *poolCond) condWorkerArgs {
-	return condWorkerArgs{&p.running, &p.q, &p.unhandled, p.cwg, p.cond}
+	return condWorkerArgs{p.opts, &p.running, &p.q, &p.unhandled, p.cwg, p.cond}
 }

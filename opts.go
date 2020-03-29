@@ -5,13 +5,14 @@ package jett
 
 // Opts provides options when creating new pools.
 type Opts struct {
-	MinWorkers int // Minimum number of go routines.
-	MaxWorkers int // Maximum number of go routines.
-	QueueSize  int // Number of items in the queue before we block.
+	MinWorkers       int  // Minimum number of go routines.
+	MaxWorkers       int  // Maximum number of go routines.
+	QueueSize        int  // Number of items in the queue before we block.
+	CloseImmediately bool // If true, calling Close() will return as soon as possible, potentially leaving messages unprocessed. If false, process all messages before returning.
 }
 
 func NewDefaultOpts() Opts {
-	return Opts{MinWorkers: 1, MaxWorkers: 10, QueueSize: 256}
+	return Opts{MinWorkers: 1, MaxWorkers: 10, QueueSize: 256, CloseImmediately: false}
 }
 
 // scrub() returns the options with any illegal
