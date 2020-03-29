@@ -10,13 +10,12 @@ import (
 // POOL-COND
 
 type poolCond struct {
-	q           queue
-	done        chan struct{}
-	running     bool
-	cwg         *countedWaitGroup
-	unhandled   int64 // Number of messages that are in the system, queued or processing
-	workerCount int64 // Number of current active workers
-	cond        *mutexCond
+	q         queue
+	done      chan struct{}
+	running   bool
+	cwg       *countedWaitGroup
+	unhandled int64 // Number of messages that are in the system, queued or processing
+	cond      *mutexCond
 }
 
 func (p *poolCond) Run(f RunFunc) error {
@@ -30,8 +29,7 @@ func (p *poolCond) Run(f RunFunc) error {
 	// If we have more unhandled items then workers
 	// to handle them and we aren't at the worker limit, add one.
 	unhandled := atomic.LoadInt64(&p.unhandled)
-	workerCount := atomic.LoadInt64(&p.workerCount)
-	if unhandled > workerCount {
+	if unhandled > int64(p.cwg.count()) {
 		p.startDynamicWorker()
 	}
 
@@ -48,21 +46,18 @@ func (p *poolCond) Close() error {
 
 func (p *poolCond) startStaticWorker() {
 	p.cwg.add()
-	atomic.AddInt64(&p.workerCount, 1)
 
 	go staticCondWorker(newCondWorkerArgs(p))
 }
 
 func (p *poolCond) startDynamicWorker() {
 	p.cwg.add()
-	atomic.AddInt64(&p.workerCount, 1)
 
 	go dynamicCondWorker(newCondWorkerArgs(p))
 }
 
 func staticCondWorker(args condWorkerArgs) {
 	defer args.cwg.done()
-	defer atomic.AddInt64(args.workerCount, -1)
 
 	for *args.running == true {
 		workerRunAll(args)
@@ -72,7 +67,6 @@ func staticCondWorker(args condWorkerArgs) {
 
 func dynamicCondWorker(args condWorkerArgs) {
 	defer args.cwg.done()
-	defer atomic.AddInt64(args.workerCount, -1)
 
 	workerRunAll(args)
 }
@@ -138,15 +132,14 @@ func (q *queue) pop() RunFunc {
 // Not strictly necessary, but prevents making assumptions
 // about the contents of the pool struct.
 type condWorkerArgs struct {
-	running     *bool
-	q           *queue
-	unhandled   *int64
-	workerCount *int64
-	done        chan struct{}
-	cwg         *countedWaitGroup
-	cond        *mutexCond
+	running   *bool
+	q         *queue
+	unhandled *int64
+	done      chan struct{}
+	cwg       *countedWaitGroup
+	cond      *mutexCond
 }
 
 func newCondWorkerArgs(p *poolCond) condWorkerArgs {
-	return condWorkerArgs{&p.running, &p.q, &p.unhandled, &p.workerCount, p.done, p.cwg, p.cond}
+	return condWorkerArgs{&p.running, &p.q, &p.unhandled, p.done, p.cwg, p.cond}
 }
