@@ -5,6 +5,34 @@ import (
 	"sync/atomic"
 )
 
+// ------------------------------------------------------------
+// MUTEX-COND
+
+// mutexCond combines a Cond with its locker.
+type mutexCond struct {
+	m sync.Mutex
+	c *sync.Cond
+}
+
+func newMutexCond() *mutexCond {
+	mc := &mutexCond{}
+	mc.c = sync.NewCond(&mc.m)
+	return mc
+}
+
+func (m *mutexCond) signal() {
+	m.c.Signal()
+}
+
+func (m *mutexCond) wait() {
+	m.m.Lock()
+	m.c.Wait()
+	m.m.Unlock()
+}
+
+// ------------------------------------------------------------
+// COUNTED-WAIT-GROUP
+
 // countedWaitGroup tracks the number of items in the
 // wait group. Be super nice if you could just ask the wait group.
 type countedWaitGroup struct {
