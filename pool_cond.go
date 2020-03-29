@@ -13,7 +13,7 @@ func newCondWith(opts Opts) Pool {
 	opts = opts.scrub()
 	cwg := &countedWaitGroup{}
 	cond := newMutexCond()
-	p := &poolCond{running: true, cwg: cwg, cond: cond}
+	p := &poolCond{opts: opts, running: true, cwg: cwg, cond: cond}
 	// Start fixed routines
 	for i := 0; i < opts.MinWorkers; i++ {
 		p.startStaticWorker()
@@ -22,6 +22,7 @@ func newCondWith(opts Opts) Pool {
 }
 
 type poolCond struct {
+	opts      Opts
 	q         queue
 	running   bool
 	cwg       *countedWaitGroup
@@ -40,7 +41,8 @@ func (p *poolCond) Run(f RunFunc) error {
 	// If we have more unhandled items then workers
 	// to handle them and we aren't at the worker limit, add one.
 	unhandled := atomic.LoadInt64(&p.unhandled)
-	if unhandled > int64(p.cwg.count()) {
+	workers := p.cwg.count()
+	if unhandled > int64(workers) && int(workers) < p.opts.MaxWorkers {
 		p.startDynamicWorker()
 	}
 
