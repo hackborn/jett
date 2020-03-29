@@ -9,9 +9,20 @@ import (
 // ------------------------------------------------------------
 // POOL-COND
 
+func newCondWith(opts Opts) Pool {
+	opts = opts.scrub()
+	cwg := &countedWaitGroup{}
+	cond := newMutexCond()
+	p := &poolCond{running: true, cwg: cwg, cond: cond}
+	// Start fixed routines
+	for i := 0; i < opts.MinWorkers; i++ {
+		p.startStaticWorker()
+	}
+	return p
+}
+
 type poolCond struct {
 	q         queue
-	done      chan struct{}
 	running   bool
 	cwg       *countedWaitGroup
 	unhandled int64 // Number of messages that are in the system, queued or processing
@@ -37,7 +48,6 @@ func (p *poolCond) Run(f RunFunc) error {
 }
 
 func (p *poolCond) Close() error {
-	close(p.done)
 	p.running = false
 	p.cond.c.Broadcast()
 	p.cwg.wait()
@@ -135,11 +145,10 @@ type condWorkerArgs struct {
 	running   *bool
 	q         *queue
 	unhandled *int64
-	done      chan struct{}
 	cwg       *countedWaitGroup
 	cond      *mutexCond
 }
 
 func newCondWorkerArgs(p *poolCond) condWorkerArgs {
-	return condWorkerArgs{&p.running, &p.q, &p.unhandled, p.done, p.cwg, p.cond}
+	return condWorkerArgs{&p.running, &p.q, &p.unhandled, p.cwg, p.cond}
 }

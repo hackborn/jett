@@ -7,6 +7,19 @@ import (
 // ------------------------------------------------------------
 // POOL-CHAN
 
+func newChanWith(opts Opts) Pool {
+	opts = opts.scrub()
+	queue := make(chan func() error, opts.QueueSize)
+	done := make(chan struct{})
+	cwg := &countedWaitGroup{}
+	p := &poolChan{queue: queue, done: done, cwg: cwg}
+	// Start fixed routines
+	for i := 0; i < opts.MinWorkers; i++ {
+		p.startWorker()
+	}
+	return p
+}
+
 type poolChan struct {
 	queue chan func() error
 	done  chan struct{}
