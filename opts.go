@@ -1,14 +1,19 @@
 package jett
 
+import (
+	"context"
+)
+
 // ------------------------------------------------------------
 // OPTS
 
 // Opts provides options when creating new pools.
 type Opts struct {
-	MinWorkers       int  // Minimum number of go routines.
-	MaxWorkers       int  // Maximum number of go routines.
-	QueueSize        int  // Number of items in the queue before we block.
-	CloseImmediately bool // If true, calling Close() will return as soon as possible, potentially leaving messages unprocessed. If false, process all messages before returning.
+	MinWorkers       int            // Minimum number of go routines.
+	MaxWorkers       int            // Maximum number of go routines.
+	QueueSize        int            // Number of items in the queue before we block.
+	CloseImmediately bool           // If true, calling Close() will return as soon as possible, potentially leaving messages unprocessed. If false, process all messages before returning.
+	WorkerInit       NewContextFunc // Optional. If not nil, generate a new context on each worker routine that gets passed to all RunFuncs that are performed on that routine. Must be thread safe.
 }
 
 func NewDefaultOpts() Opts {
@@ -28,4 +33,11 @@ func (o Opts) scrub() Opts {
 		o.QueueSize = 1
 	}
 	return o
+}
+
+func (o Opts) runWorkerInit() (context.Context, error) {
+	if o.WorkerInit == nil {
+		return nil, nil
+	}
+	return o.WorkerInit()
 }

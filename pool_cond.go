@@ -1,6 +1,8 @@
 package jett
 
 import (
+	"context"
+	"fmt"
 	"github.com/micro-go/lock"
 	"sync"
 	"sync/atomic"
@@ -80,10 +82,16 @@ func staticCondWorker(args condWorkerArgs, id int) {
 	// defer fmt.Println("static worker DONE", id)
 	defer args.cwg.done()
 
+	ctx, err := args.opts.runWorkerInit()
+	if err != nil {
+		fmt.Println("Can't init worker:", err)
+		return
+	}
+
 	// fmt.Println("STATIC WAIT 0 id", id, "running", args.isRunning())
 	for args.isRunning() {
 		// fmt.Println("STATIC WAIT 1", id)
-		workerRunAll(args, id)
+		workerRunAll(args, ctx, id)
 		// fmt.Println("STATIC WAIT 2")
 
 		args.cond.m.Lock()
@@ -102,15 +110,21 @@ func dynamicCondWorker(args condWorkerArgs, id int) {
 	// defer fmt.Println("dynamic worker DONE", id)
 	defer args.cwg.done()
 
-	workerRunAll(args, id)
+	ctx, err := args.opts.runWorkerInit()
+	if err != nil {
+		fmt.Println("Can't init worker:", err)
+		return
+	}
+
+	workerRunAll(args, ctx, id)
 }
 
-func workerRunAll(args condWorkerArgs, id int) {
+func workerRunAll(args condWorkerArgs, ctx context.Context, id int) {
 	// fmt.Println("workerRun", id, "queue len", args.q.len())
 	f := args.q.pop()
 	for f != nil {
 		// fmt.Println("worker", id, "queue len", args.q.len())
-		f()
+		f(ctx)
 		atomic.AddInt64(args.unhandled, -1)
 
 		// Bail if the pool is done running

@@ -3,12 +3,15 @@ package jett
 // ------------------------------------------------------------
 // POOL
 
-// RunFunc defines runnable behaviour clients can send to the pool.
-type RunFunc func() error
-
 // Pool defines a worker pool for running operations.
 type Pool interface {
+	// Schedule the RunFunc on one of the worker routines.
+	// The func will be passed a Context only if an Opts.WorkerInit
+	// was supplied when the pool was created.
 	Run(RunFunc) error
+
+	// Close the pool. Either wait for pending operations to
+	// finish or discard them, based on the Opts.
 	Close() error
 }
 

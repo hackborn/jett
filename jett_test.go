@@ -1,6 +1,7 @@
 package jett
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -33,7 +34,7 @@ func runTestPool(t *testing.T, opts Opts, operations int, block *Block) {
 	var have int32 = 0
 
 	for i := 0; i < operations; i++ {
-		f := func() error {
+		f := func(context.Context) error {
 			atomic.AddInt32(&have, 1)
 			return nil
 		}
@@ -76,8 +77,8 @@ func (b *Block) Handler(inner RunFunc) RunFunc {
 	b.accumulatingWg.Add(1)
 
 	fmt.Println("Add Handler")
-	wrapper := func() error {
-		return b.handle(inner)
+	wrapper := func(ctx context.Context) error {
+		return b.handle(ctx, inner)
 	}
 	return wrapper
 }
@@ -102,7 +103,7 @@ func (b *Block) Run() {
 	fmt.Println("Run() 3")
 }
 
-func (b *Block) handle(f RunFunc) error {
+func (b *Block) handle(ctx context.Context, f RunFunc) error {
 	fmt.Println("handle()")
 	defer b.runningWg.Done()
 	defer fmt.Println("handle() DONE")
@@ -119,7 +120,7 @@ func (b *Block) handle(f RunFunc) error {
 	}()
 	b.runningCond.wait()
 
-	f()
+	f(ctx)
 
 	return nil
 }

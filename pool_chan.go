@@ -9,10 +9,10 @@ import (
 
 func newChanWith(opts Opts) Pool {
 	opts = opts.scrub()
-	queue := make(chan func() error, opts.QueueSize)
+	queue := make(chan RunFunc, opts.QueueSize)
 	done := make(chan struct{})
 	cwg := &countedWaitGroup{}
-	p := &poolChan{queue: queue, done: done, cwg: cwg}
+	p := &poolChan{opts: opts, queue: queue, done: done, cwg: cwg}
 	// Start fixed routines
 	for i := 0; i < opts.MinWorkers; i++ {
 		p.startWorker()
@@ -21,7 +21,8 @@ func newChanWith(opts Opts) Pool {
 }
 
 type poolChan struct {
-	queue chan func() error
+	opts  Opts
+	queue chan RunFunc
 	done  chan struct{}
 	cwg   *countedWaitGroup
 }
@@ -56,13 +57,19 @@ func (p *poolChan) startWorker() {
 func chanWorker(args chanWorkerArgs) {
 	defer args.cwg.done()
 
+	ctx, err := args.opts.runWorkerInit()
+	if err != nil {
+		fmt.Println("Can't init worker:", err)
+		return
+	}
+
 	for {
 		select {
 		case <-args.done:
 			return
 		case f, more := <-args.queue:
 			if more {
-				f()
+				f(ctx)
 				//				fmt.Println("msg", msg)
 			}
 		}
@@ -76,11 +83,12 @@ func chanWorker(args chanWorkerArgs) {
 // Not strictly necessary, but prevents making assumptions
 // about the contents of the pool struct.
 type chanWorkerArgs struct {
-	queue <-chan func() error
+	opts  Opts
+	queue <-chan RunFunc
 	done  chan struct{}
 	cwg   *countedWaitGroup
 }
 
 func newChanWorkerArgs(p *poolChan) chanWorkerArgs {
-	return chanWorkerArgs{p.queue, p.done, p.cwg}
+	return chanWorkerArgs{p.opts, p.queue, p.done, p.cwg}
 }
