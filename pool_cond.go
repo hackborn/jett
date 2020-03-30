@@ -1,7 +1,6 @@
 package jett
 
 import (
-	"fmt"
 	"github.com/micro-go/lock"
 	"sync"
 	"sync/atomic"
@@ -37,7 +36,6 @@ func (p *poolCond) Run(f RunFunc) error {
 	}
 	atomic.AddInt64(&p.unhandled, 1)
 	p.q.push(f)
-	fmt.Println("SIGNAL")
 	p.cond.broadcast()
 
 	// If we have more unhandled items then workers
@@ -52,11 +50,11 @@ func (p *poolCond) Run(f RunFunc) error {
 }
 
 func (p *poolCond) Close() error {
-	fmt.Println("Close 1")
+	// fmt.Println("Close 1")
 	p.stopAll()
-	fmt.Println("Close 2")
+	// fmt.Println("Close 2")
 	p.cwg.wait()
-	fmt.Println("Close 3")
+	// fmt.Println("Close 3")
 	return nil
 }
 
@@ -79,14 +77,14 @@ func (p *poolCond) startDynamicWorker() {
 }
 
 func staticCondWorker(args condWorkerArgs, id int) {
-	defer fmt.Println("static worker DONE", id)
+	// defer fmt.Println("static worker DONE", id)
 	defer args.cwg.done()
 
-	fmt.Println("STATIC WAIT 0 id", id, "running", args.isRunning())
+	// fmt.Println("STATIC WAIT 0 id", id, "running", args.isRunning())
 	for args.isRunning() {
-		fmt.Println("STATIC WAIT 1", id)
+		// fmt.Println("STATIC WAIT 1", id)
 		workerRunAll(args, id)
-		fmt.Println("STATIC WAIT 2")
+		// fmt.Println("STATIC WAIT 2")
 
 		args.cond.m.Lock()
 		if *args.running == true {
@@ -94,31 +92,31 @@ func staticCondWorker(args condWorkerArgs, id int) {
 		}
 		args.cond.m.Unlock()
 
-		fmt.Println("STATIC WAIT 3")
+		// fmt.Println("STATIC WAIT 3")
 	}
-	fmt.Println("STATIC WAIT DONE")
+	// fmt.Println("STATIC WAIT DONE")
 
 }
 
 func dynamicCondWorker(args condWorkerArgs, id int) {
-	defer fmt.Println("dynamic worker DONE", id)
+	// defer fmt.Println("dynamic worker DONE", id)
 	defer args.cwg.done()
 
 	workerRunAll(args, id)
 }
 
 func workerRunAll(args condWorkerArgs, id int) {
-	fmt.Println("workerRun", id, "queue len", args.q.len())
+	// fmt.Println("workerRun", id, "queue len", args.q.len())
 	f := args.q.pop()
 	for f != nil {
-		fmt.Println("worker", id, "queue len", args.q.len())
+		// fmt.Println("worker", id, "queue len", args.q.len())
 		f()
 		atomic.AddInt64(args.unhandled, -1)
 
 		// Bail if the pool is done running
 		// and we're configured for that.
 		if args.opts.CloseImmediately && *args.running == false {
-			fmt.Println("worker return")
+			// fmt.Println("worker return")
 			return
 		}
 
