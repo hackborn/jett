@@ -1,6 +1,7 @@
 package jett
 
 import (
+	"fmt"
 	"github.com/micro-go/lock"
 	"sync"
 	"sync/atomic"
@@ -36,7 +37,8 @@ func (p *poolCond) Run(f RunFunc) error {
 	}
 	atomic.AddInt64(&p.unhandled, 1)
 	p.q.push(f)
-	p.cond.signal()
+	fmt.Println("SIGNAL")
+	p.cond.broadcast()
 
 	// If we have more unhandled items then workers
 	// to handle them and we aren't at the worker limit, add one.
@@ -50,48 +52,72 @@ func (p *poolCond) Run(f RunFunc) error {
 }
 
 func (p *poolCond) Close() error {
-	p.running = false
-	p.cond.c.Broadcast()
+	fmt.Println("Close 1")
+	p.stopAll()
+	fmt.Println("Close 2")
 	p.cwg.wait()
+	fmt.Println("Close 3")
 	return nil
+}
+
+func (p *poolCond) stopAll() {
+	defer lock.Locker(&p.cond.m).Unlock()
+	p.running = false
+	p.cond.broadcast()
 }
 
 func (p *poolCond) startStaticWorker() {
 	p.cwg.add()
 
-	go staticCondWorker(newCondWorkerArgs(p))
+	go staticCondWorker(newCondWorkerArgs(p), int(p.cwg.count()))
 }
 
 func (p *poolCond) startDynamicWorker() {
 	p.cwg.add()
 
-	go dynamicCondWorker(newCondWorkerArgs(p))
+	go dynamicCondWorker(newCondWorkerArgs(p), int(p.cwg.count()))
 }
 
-func staticCondWorker(args condWorkerArgs) {
+func staticCondWorker(args condWorkerArgs, id int) {
+	defer fmt.Println("static worker DONE", id)
 	defer args.cwg.done()
 
-	for *args.running == true {
-		workerRunAll(args)
-		args.cond.wait()
+	fmt.Println("STATIC WAIT 0 id", id)
+	for args.isRunning() {
+		workerRunAll(args, id)
+		fmt.Println("STATIC WAIT 1")
+
+		args.cond.m.Lock()
+		if *args.running == true {
+			args.cond.c.Wait()
+		}
+		args.cond.m.Unlock()
+
+		fmt.Println("STATIC WAIT 2")
 	}
+	fmt.Println("STATIC WAIT DONE")
+
 }
 
-func dynamicCondWorker(args condWorkerArgs) {
+func dynamicCondWorker(args condWorkerArgs, id int) {
+	defer fmt.Println("dynamic worker DONE", id)
 	defer args.cwg.done()
 
-	workerRunAll(args)
+	workerRunAll(args, id)
 }
 
-func workerRunAll(args condWorkerArgs) {
+func workerRunAll(args condWorkerArgs, id int) {
+	fmt.Println("workerRun", id, "queue len", args.q.len())
 	f := args.q.pop()
 	for f != nil {
+		fmt.Println("worker", id, "queue len", args.q.len())
 		f()
 		atomic.AddInt64(args.unhandled, -1)
 
 		// Bail if the pool is done running
 		// and we're configured for that.
 		if args.opts.CloseImmediately && *args.running == false {
+			fmt.Println("worker return")
 			return
 		}
 
@@ -114,6 +140,17 @@ type queue struct {
 	mutex sync.Mutex
 	first *node
 	last  *node
+}
+
+func (q *queue) len() int {
+	defer lock.Locker(&q.mutex).Unlock()
+	c := 0
+	n := q.first
+	for n != nil {
+		c++
+		n = n.next
+	}
+	return c
 }
 
 func (q *queue) push(f RunFunc) {
@@ -161,4 +198,9 @@ type condWorkerArgs struct {
 
 func newCondWorkerArgs(p *poolCond) condWorkerArgs {
 	return condWorkerArgs{p.opts, &p.running, &p.q, &p.unhandled, p.cwg, p.cond}
+}
+
+func (a condWorkerArgs) isRunning() bool {
+	defer lock.Locker(&a.cond.m).Unlock()
+	return *a.running == false
 }

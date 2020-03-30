@@ -20,6 +20,10 @@ func newMutexCond() *mutexCond {
 	return mc
 }
 
+func (m *mutexCond) broadcast() {
+	m.c.Broadcast()
+}
+
 func (m *mutexCond) signal() {
 	m.c.Signal()
 }

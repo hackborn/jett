@@ -42,8 +42,10 @@ func runTestPool(t *testing.T, opts Opts, operations int, block *Block) {
 	}
 	// Wait for the block
 	fmt.Println("BLOCK 1")
-	block.Wait()
+	block.Accumulate()
 	fmt.Println("BLOCK 2")
+	block.Run()
+	fmt.Println("BLOCK 3")
 	if have != int32(operations) {
 		fmt.Println("mismatch, have", have, "want", operations)
 		t.Fatal()
@@ -55,22 +57,29 @@ func runTestPool(t *testing.T, opts Opts, operations int, block *Block) {
 
 // Block blocks on messages.
 type Block struct {
-	done    chan struct{}
-	wg      sync.WaitGroup
-	running bool
-	mutex   sync.Mutex
-	want    int // How many items I want before I unblock.
-	have    int // How many items I have.
-	waiting []chan BlockCmd
+	runningWg        sync.WaitGroup
+	running          bool
+	mutex            sync.Mutex
+	want             int // How many items I want before I unblock.
+	have             int // How many items I have.
+	waiting          []chan BlockCmd
+	stage            BlockStage
+	accumulatingWg   sync.WaitGroup
+	accumulatingCond *mutexCond
+	runningCond      *mutexCond
 }
 
 func newBlock(want int) *Block {
-	return &Block{want: want}
+	accumulatingCond := newMutexCond()
+	runningCond := newMutexCond()
+	return &Block{want: want, stage: StageAccumulating, accumulatingCond: accumulatingCond, runningCond: runningCond}
 }
 
 func (b *Block) Handler(inner RunFunc) RunFunc {
 	b.init()
-	b.wg.Add(1)
+	b.runningWg.Add(1)
+	b.accumulatingWg.Add(1)
+
 	fmt.Println("Add Handler")
 	wrapper := func() error {
 		return b.handle(inner)
@@ -79,48 +88,51 @@ func (b *Block) Handler(inner RunFunc) RunFunc {
 }
 
 func (b *Block) Close() error {
+	fmt.Println("....block close??")
 	b.running = false
-	close(b.done)
-	b.wg.Wait()
+	b.accumulatingCond.c.Broadcast()
+	//	b.wg.Wait()
 	return nil
 }
 
-func (b *Block) Wait() {
-	b.wg.Wait()
+func (b *Block) Accumulate() {
+	fmt.Println("ACCUMULATE 1")
+	b.accumulatingWg.Wait()
+	fmt.Println("ACCUMULATE 2")
+}
+
+func (b *Block) Run() {
+	fmt.Println("Run() 1")
+	b.runningCond.c.Broadcast()
+	fmt.Println("Run() 2")
+	b.runningWg.Wait()
+	fmt.Println("Run() 3")
 }
 
 func (b *Block) handle(f RunFunc) error {
 	fmt.Println("handle()")
+	defer b.runningWg.Done()
 	defer fmt.Println("handle() DONE")
-	defer b.wg.Done()
 	if !b.running {
+		fmt.Println("finish ACCUM WG ??")
+		b.accumulatingWg.Done()
 		return nil
 	}
 
-	if b.handled(f) {
-		fmt.Println("handle() handled")
-		return nil
-	}
+	//	if b.handled(f) {
+	//		fmt.Println("handle() handled")
+	//		return nil
+	//	}
 
-	// Register waiter
-	c := make(chan BlockCmd)
-	b.addWaitingChannel(c)
-	defer b.waitingChannelFinished(c)
+	// Wait for everyone to accumulate
+	go func() {
+		fmt.Println("finish ACCUM WG 1")
+		b.accumulatingWg.Done()
+	}()
+	b.runningCond.wait()
 
-	// Wait
-	fmt.Println("handle() BLOCK")
-	for {
-		select {
-		case <-b.done:
-			return nil
-		case cmd, more := <-c:
-			if more && cmd == CmdRun {
-				fmt.Println("waiter called")
-				f()
-			}
-			return nil
-		}
-	}
+	f()
+
 	return nil
 }
 
@@ -131,9 +143,12 @@ func (b *Block) handled(f RunFunc) bool {
 	if b.have >= b.want {
 		fmt.Println("block FLUSH")
 		// Flush
-		for _, c := range b.waiting {
-			c <- CmdRun
-		}
+		b.accumulatingCond.c.Broadcast()
+		/*
+			for _, c := range b.waiting {
+				c <- CmdRun
+			}
+		*/
 		f()
 		return true
 	}
@@ -142,10 +157,7 @@ func (b *Block) handled(f RunFunc) bool {
 
 // init() performs necessary initialization dynamically.
 func (b *Block) init() {
-	if b.done == nil {
-		b.done = make(chan struct{})
-		b.running = true
-	}
+	b.running = true
 }
 
 func (b *Block) addWaitingChannel(c chan BlockCmd) {
@@ -161,16 +173,23 @@ func (b *Block) waitingChannelFinished(c chan BlockCmd) {
 
 type BlockCmd uint32
 
+const (
+	CmdRun BlockCmd = 1 << iota
+	CacheGetter
+)
+
+type BlockStage uint32
+
+const (
+	StageAccumulating BlockStage = 1 << iota
+	StageReadyToRun
+	StageRunning
+	StageDone
+)
+
 // ------------------------------------------------------------
 // CONST and VAR
 
 var (
-	stdopts = Opts{MinWorkers: 1, MaxWorkers: 10, QueueSize: 256}
-
-	blockAll = newBlock(99999)
-)
-
-const (
-	CmdRun BlockCmd = 1 << iota
-	CacheGetter
+	stdopts = Opts{MinWorkers: 1, MaxWorkers: 109, QueueSize: 256}
 )
