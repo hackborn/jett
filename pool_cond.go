@@ -69,24 +69,32 @@ func (p *poolCond) stopAll() {
 func (p *poolCond) startStaticWorker() {
 	p.cwg.add()
 
-	go staticCondWorker(newCondWorkerArgs(p), int(p.cwg.count()))
-}
-
-func (p *poolCond) startDynamicWorker() {
-	p.cwg.add()
-
-	go dynamicCondWorker(newCondWorkerArgs(p), int(p.cwg.count()))
-}
-
-func staticCondWorker(args condWorkerArgs, id int) {
-	// defer fmt.Println("static worker DONE", id)
-	defer args.cwg.done()
-
+	args := newCondWorkerArgs(p)
 	ctx, err := args.opts.runWorkerInit()
 	if err != nil {
 		fmt.Println("Can't init worker:", err)
 		return
 	}
+
+	go staticCondWorker(args, ctx, int(p.cwg.count()))
+}
+
+func (p *poolCond) startDynamicWorker() {
+	p.cwg.add()
+
+	args := newCondWorkerArgs(p)
+	ctx, err := args.opts.runWorkerInit()
+	if err != nil {
+		fmt.Println("Can't init worker:", err)
+		return
+	}
+
+	go dynamicCondWorker(args, ctx, int(p.cwg.count()))
+}
+
+func staticCondWorker(args condWorkerArgs, ctx context.Context, id int) {
+	// defer fmt.Println("static worker DONE", id)
+	defer args.cwg.done()
 
 	// fmt.Println("STATIC WAIT 0 id", id, "running", args.isRunning())
 	for args.isRunning() {
@@ -106,7 +114,7 @@ func staticCondWorker(args condWorkerArgs, id int) {
 
 }
 
-func dynamicCondWorker(args condWorkerArgs, id int) {
+func dynamicCondWorker(args condWorkerArgs, ctx context.Context, id int) {
 	// defer fmt.Println("dynamic worker DONE", id)
 	defer args.cwg.done()
 

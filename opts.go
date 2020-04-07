@@ -9,11 +9,25 @@ import (
 
 // Opts provides options when creating new pools.
 type Opts struct {
-	MinWorkers       int            // Minimum number of go routines.
-	MaxWorkers       int            // Maximum number of go routines.
-	QueueSize        int            // Number of items in the queue before we block.
-	CloseImmediately bool           // If true, calling Close() will return as soon as possible, potentially leaving messages unprocessed. If false, process all messages before returning.
-	WorkerInit       NewContextFunc // Optional. If not nil, generate a new context on each worker routine that gets passed to all RunFuncs that are performed on that routine. Must be thread safe.
+	// Minimum number of go routines.
+	MinWorkers int
+
+	// Maximum number of go routines.
+	MaxWorkers int
+
+	// Number of items in the queue before we block.
+	QueueSize int
+
+	// If true, calling Close() will return as soon as possible,
+	// potentially leaving messages unprocessed. If false,
+	// process all messages before returning.
+	CloseImmediately bool
+
+	// Optional. If not nil, generate a new context for each worker routine.
+	// This is run on the routine that creates the pool, then passed into
+	// the worker routine where it is in turn passed in as the context to
+	// each RunFunc.
+	WorkerInit NewContextFunc
 }
 
 func NewDefaultOpts() Opts {
