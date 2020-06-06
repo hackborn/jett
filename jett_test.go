@@ -41,11 +41,8 @@ func runTestPool(t *testing.T, opts Opts, operations int, block *Block) {
 		p.Run(block.Handler(f))
 	}
 	// Wait for the block
-	fmt.Println("BLOCK 1")
 	block.Accumulate()
-	fmt.Println("BLOCK 2")
 	block.Run()
-	fmt.Println("BLOCK 3")
 	if have != int32(operations) {
 		fmt.Println("mismatch, have", have, "want", operations)
 		t.Fatal()
@@ -76,7 +73,6 @@ func (b *Block) Handler(inner RunFunc) RunFunc {
 	b.runningWg.Add(1)
 	b.accumulatingWg.Add(1)
 
-	fmt.Println("Add Handler")
 	wrapper := func(ctx context.Context) error {
 		return b.handle(ctx, inner)
 	}
@@ -84,38 +80,28 @@ func (b *Block) Handler(inner RunFunc) RunFunc {
 }
 
 func (b *Block) Close() error {
-	fmt.Println("....block close??")
 	b.running = false
 	return nil
 }
 
 func (b *Block) Accumulate() {
-	fmt.Println("ACCUMULATE 1")
 	b.accumulatingWg.Wait()
-	fmt.Println("ACCUMULATE 2")
 }
 
 func (b *Block) Run() {
-	fmt.Println("Run() 1")
 	b.runningCond.c.Broadcast()
-	fmt.Println("Run() 2")
 	b.runningWg.Wait()
-	fmt.Println("Run() 3")
 }
 
 func (b *Block) handle(ctx context.Context, f RunFunc) error {
-	fmt.Println("handle()")
 	defer b.runningWg.Done()
-	defer fmt.Println("handle() DONE")
 	if !b.running {
-		fmt.Println("finish ACCUM WG ??")
 		b.accumulatingWg.Done()
 		return nil
 	}
 
 	// Wait for everyone to accumulate
 	go func() {
-		fmt.Println("finish ACCUM WG 1")
 		b.accumulatingWg.Done()
 	}()
 	b.runningCond.wait()
