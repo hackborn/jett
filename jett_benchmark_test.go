@@ -51,11 +51,9 @@ func sustainedSmall(t *testing.B, min, max, runners int) {
 	defer p.Close()
 
 	wait := &sync.WaitGroup{}
-	input := make([]*benchmarkRunner, runners, runners)
+	r := &benchmarkRunner{wait}
+	wait.Add(runners)
 	for i := 0; i < runners; i++ {
-		input[i] = newBenchmarkRunner(wait)
-	}
-	for _, r := range input {
 		p.Run(r.Run)
 	}
 	wait.Wait()

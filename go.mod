@@ -2,4 +2,7 @@ module github.com/hackborn/jett
 
 go 1.13
 
-require github.com/micro-go/lock v0.0.0-20181120035545-8fa93e5133ba
+require (
+	github.com/micro-go/lock v0.0.0-20181120035545-8fa93e5133ba
+	google.golang.org/grpc v1.29.1 // indirect
+)
