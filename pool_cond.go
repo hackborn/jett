@@ -132,8 +132,11 @@ func workerRunAll(args condWorkerArgs, ctx context.Context, id int) {
 	f := args.q.pop()
 	for f != nil {
 		// fmt.Println("worker", id, "queue len", args.q.len())
-		f(ctx)
+		err := f(ctx)
 		atomic.AddInt64(args.unhandled, -1)
+		if err != nil && args.opts.ErrorHandler != nil {
+			args.opts.ErrorHandler(err)
+		}
 
 		// Bail if the pool is done running
 		// and we're configured for that.

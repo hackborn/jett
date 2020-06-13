@@ -28,6 +28,11 @@ type Opts struct {
 	// the worker routine where it is in turn passed in as the context to
 	// each RunFunc.
 	WorkerInit NewContextFunc
+
+	// Optional. If not nil, handle errors resulting from RunFunc.
+	// Note that error handling happens in the worker routines, so
+	// must be thread safe.
+	ErrorHandler ErrorHandlerFunc
 }
 
 func NewDefaultOpts() Opts {

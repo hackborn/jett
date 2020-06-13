@@ -15,3 +15,9 @@ type RunFunc func(context.Context) error
 
 // NewContextFunc generates a new context.
 type NewContextFunc func() (context.Context, error)
+
+// ------------------------------------------------------------
+// ERROR-HANDLER-FUNC
+
+// ErrorHandlerFunc handles an error.
+type ErrorHandlerFunc func(error)
