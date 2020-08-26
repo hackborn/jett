@@ -72,7 +72,7 @@ func (p *poolCond) startStaticWorker() {
 	args := newCondWorkerArgs(p)
 	ctx, err := args.opts.runWorkerInit()
 	if err != nil {
-		fmt.Println("Can't init worker:", err)
+		fmt.Println(newCantInitWorker(err))
 		return
 	}
 
@@ -85,7 +85,7 @@ func (p *poolCond) startDynamicWorker() {
 	args := newCondWorkerArgs(p)
 	ctx, err := args.opts.runWorkerInit()
 	if err != nil {
-		fmt.Println("Can't init worker:", err)
+		fmt.Println(newCantInitWorker(err))
 		return
 	}
 

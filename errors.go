@@ -1,8 +1,15 @@
 package jett
 
 import (
-	"errors"
+	"fmt"
 )
+
+// ------------------------------------------------------------
+// WRAPPERS
+
+func newCantInitWorker(err error) error {
+	return fmt.Errorf("Can't init worker: %w", err)
+}
 
 // ------------------------------------------------------------
 // CONST and VAR
@@ -12,5 +19,5 @@ const (
 )
 
 var (
-	ErrBadRequest = errors.New(badRequestMsg)
+	ErrBadRequest = fmt.Errorf(badRequestMsg)
 )

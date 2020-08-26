@@ -59,7 +59,7 @@ func chanWorker(args chanWorkerArgs) {
 
 	ctx, err := args.opts.runWorkerInit()
 	if err != nil {
-		fmt.Println("Can't init worker:", err)
+		fmt.Println(newCantInitWorker(err))
 		return
 	}
 
@@ -69,8 +69,10 @@ func chanWorker(args chanWorkerArgs) {
 			return
 		case f, more := <-args.queue:
 			if more {
-				f(ctx)
-				//				fmt.Println("msg", msg)
+				err = f(ctx)
+				if err != nil {
+					fmt.Println(err)
+				}
 			}
 		}
 	}
