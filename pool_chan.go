@@ -34,10 +34,10 @@ func (p *poolChan) Run(f RunFunc) error {
 	p.queue <- f
 	// If the queue is backed up and we have some
 	// headroom, spin up a new routine.
-	fmt.Println("Run() queue len", len(p.queue), "workers", p.cwg.count())
+	//	fmt.Println("Run() queue len", len(p.queue), "workers", p.cwg.count())
 	if len(p.queue) > int(p.cwg.count()) {
-		fmt.Println("Run() startWorker")
-		//		p.startWorker()
+		//		fmt.Println("Run() startWorker")
+		p.startWorker()
 	}
 	return nil
 }
@@ -49,7 +49,6 @@ func (p *poolChan) Close() error {
 }
 
 func (p *poolChan) startWorker() {
-	fmt.Println("start worker")
 	p.cwg.add()
 	go chanWorker(newChanWorkerArgs(p))
 }
